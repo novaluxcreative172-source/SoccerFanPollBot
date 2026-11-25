@@ -23,6 +23,17 @@ const CONFIG_PATH = path.join(__dirname, "config.json");
 let groupChatId = process.env.GROUP_CHAT_ID || null;
 let lastPollKey = null;
 let pollCount = 0;
+let pollTimer = null;
+
+function startScheduler() {
+  if (pollTimer || !groupChatId) return;
+  console.log("Starting poll scheduler for group:", groupChatId);
+  // First automatic poll is sent one full interval after setup/startup.
+  pollTimer = setInterval(() => {
+    const target = groupChatId;
+    if (target) sendPoll(target).catch(error => console.error("Scheduled poll failed:", error.message));
+  }, INTERVAL_MS);
+}
 
 function saveConfig() {
   try {
@@ -101,6 +112,7 @@ bot.command("setgroup", async ctx => {
   if (ctx.chat.type === "private") return ctx.reply("Run /setgroup inside the Telegram group you want me to post in.");
   groupChatId = String(ctx.chat.id);
   saveConfig();
+  startScheduler();
   await ctx.reply("✅ This group is now connected! I'll post a football poll every " + INTERVAL_HOURS + " hours. Make sure I can send messages, photos and polls.");
   console.log("Connected group:", groupChatId);
 });
@@ -143,10 +155,7 @@ async function start() {
   console.log("Poll interval: every " + INTERVAL_HOURS + " hours.");
   if (groupChatId) {
     console.log("Connected group:", groupChatId);
-    // First scheduled poll occurs one full interval after startup.
-    setInterval(() => {
-      sendPoll(groupChatId).catch(error => console.error("Scheduled poll failed:", error.message));
-    }, INTERVAL_MS);
+    startScheduler();
   } else {
     console.log("No group configured yet. Add the bot to a group and run /setgroup as a configured admin.");
   }
